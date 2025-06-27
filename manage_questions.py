@@ -27,10 +27,8 @@ def load_questions():
     return questions
 
 def backup_questions(data):
-    # 備份成固定檔名
     with open(BACKUP_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    # 備份成時間戳檔名
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     with open(f"questions_{timestamp}.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -42,18 +40,30 @@ def check_external_change(current_data):
         backup_data = json.load(f)
     return current_data != backup_data
 
-def save_questions(questions):
+def save_questions(updated_questions):
+    if os.path.exists(QUESTION_FILE):
+        with open(QUESTION_FILE, "r", encoding="utf-8") as f:
+            current_data = json.load(f)
+    else:
+        current_data = []
+
+    current_dict = {q["question"]: q for q in current_data}
+    for q in updated_questions:
+        current_dict[q["question"]] = q
+
+    merged_data = list(current_dict.values())
+
     with open(QUESTION_FILE, "w", encoding="utf-8") as f:
-        json.dump(questions, f, ensure_ascii=False, indent=2)
-    backup_questions(questions)
+        json.dump(merged_data, f, ensure_ascii=False, indent=2)
+
+    backup_questions(merged_data)
 
 def show_question_manager():
-    st.title("📚 題庫管理頁")
+    st.title("📚 題庫後台管理")
 
     init_questions()
     questions = load_questions()
 
-    # 檢查題庫是否被外部修改
     if check_external_change(questions):
         st.warning("⚠️ 偵測到題庫檔案與上次備份不同，可能被外部修改過")
 
@@ -72,12 +82,20 @@ def show_question_manager():
                 if st.button("💾 儲存", key=f"save_{idx}"):
                     save_questions(questions)
                     st.success("✅ 該題已儲存")
+                    st.rerun()
             with col2:
                 if st.button("❌ 刪除", key=f"del_{idx}"):
                     questions.pop(idx)
                     save_questions(questions)
                     st.success("✅ 已刪除該題")
                     st.rerun()
+
+    # 一鍵儲存
+    st.markdown("---")
+    if st.button("💾 一鍵儲存"):
+        save_questions(questions)
+        st.success("✅ 所有修改已儲存")
+        st.rerun()
 
     # 新增題目
     st.markdown("---")
@@ -100,12 +118,6 @@ def show_question_manager():
             st.rerun()
         else:
             st.warning("❗ 題目與關鍵字為必填欄位")
-
-    # 一鍵儲存
-    st.markdown("---")
-    if st.button("💾 一鍵儲存所有修改"):
-        save_questions(questions)
-        st.success("✅ 所有修改已儲存")
 
     # 題庫設定區
     st.markdown("---")
@@ -154,7 +166,6 @@ def show_question_manager():
                 json.dump(config, f, ensure_ascii=False, indent=2)
             st.success(f"✅ 已儲存：CH{selected_chapter}，共 {num_questions} 題")
 
-    # 清除設定
     if os.path.exists(CONFIG_FILE):
         if st.button("🗑️ 清除設定"):
             os.remove(CONFIG_FILE)
