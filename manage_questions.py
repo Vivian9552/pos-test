@@ -5,6 +5,12 @@ import os
 import re
 from datetime import datetime
 
+try:
+    import pandas as pd
+except ImportError:
+    st.error("❗ 本功能需要安裝 pandas 套件，請在終端機執行：pip install pandas openpyxl")
+    st.stop()
+
 QUESTION_FILE = "questions.json"
 CONFIG_FILE = "quiz_config.json"
 BACKUP_FILE = "questions_backup.json"
@@ -77,12 +83,10 @@ def show_question_manager():
                     st.success("✅ 已刪除該題")
                     st.rerun()
 
-    # 一鍵儲存
     if st.button("💾 一鍵儲存"):
         save_questions(questions)
         st.success("✅ 所有修改已儲存")
 
-    # 新增題目
     st.markdown("---")
     st.header("➕ 新增新題目")
     new_q = st.text_input("題目內容", key="new_q")
@@ -104,24 +108,56 @@ def show_question_manager():
         else:
             st.warning("❗ 題目與關鍵字為必填欄位")
 
-    # 題庫設定區
+    st.markdown("---")
+    st.header("📥 匯入 Excel 題庫")
+
+    uploaded_file = st.file_uploader("選擇 Excel 檔案（需包含：章節、題目、關鍵字、說明 四欄）", type=["xlsx"])
+
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file, engine="openpyxl")
+            required_columns = {"章節", "題目", "關鍵字", "說明"}
+
+            if not required_columns.issubset(set(df.columns)):
+                st.error("❗ 欄位錯誤，請確認 Excel 包含：章節、題目、關鍵字、說明")
+            else:
+                imported = 0
+                for _, row in df.iterrows():
+                    q = {
+                        "chapter": str(row["章節"]).strip(),
+                        "question": str(row["題目"]).strip(),
+                        "keywords": [k.strip() for k in str(row["關鍵字"]).split(",")],
+                        "explanation": str(row["說明"]).strip()
+                    }
+                    questions.append(q)
+                    imported += 1
+
+                save_questions(questions)
+                st.success(f"✅ 成功匯入 {imported} 題題目！")
+                st.rerun()
+        except Exception as e:
+            st.error(f"⚠️ 匯入失敗：{e}")
+
     st.markdown("---")
     st.header("🧪 每日考題設定")
 
-    chapter_list = sorted(
-        {q["chapter"] for q in questions if re.match(r"^\d+(\.\d+)*$", q.get("chapter", ""))},
-        key=chapter_to_tuple
-    )
-    selected_chapter = st.selectbox("📘 今日出題章節上限", chapter_list, format_func=lambda x: f"CH{x}")
+    input_chapter = st.text_input("章節 CH【】 輸入上限（如 6.6）", key="chapter_limit")
+    if input_chapter:
+        try:
+            limit_tuple = chapter_to_tuple(input_chapter)
 
-    if selected_chapter:
-        selected_tuple = chapter_to_tuple(selected_chapter)
-        available_questions = [
-            q for q in questions
-            if q.get("chapter") and chapter_to_tuple(q["chapter"]) <= selected_tuple
-        ]
+            def chapter_valid(chapter_str):
+                try:
+                    return chapter_to_tuple(chapter_str) <= limit_tuple
+                except:
+                    return False
+
+            available_questions = [q for q in questions if chapter_valid(q.get("chapter", ""))]
+        except Exception:
+            st.error("❗ 請輸入正確格式，例如 6.6 或 10.1.7")
+            available_questions = []
     else:
-        available_questions = questions
+        available_questions = []
 
     max_questions = len(available_questions)
 
@@ -144,12 +180,12 @@ def show_question_manager():
 
         if st.button("📌 儲存今日設定"):
             config = {
-                "chapter": selected_chapter,
+                "chapter": input_chapter,
                 "num_questions": num_questions
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
-            st.success(f"✅ 已儲存：CH{selected_chapter}，共 {num_questions} 題")
+            st.success(f"✅ 已儲存：CH{input_chapter}，共 {num_questions} 題")
 
     if os.path.exists(CONFIG_FILE):
         if st.button("🗑️ 清除設定"):
