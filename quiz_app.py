@@ -1,11 +1,17 @@
-# quiz_app.py
 import streamlit as st
 import json
 import os
 import random
+import re
 
 QUESTION_FILE = "questions.json"
 CONFIG_FILE = "quiz_config.json"
+
+# 將章節字串轉為 tuple（如 6.6 → (6,6)，10.1.7 → (10,1,7)）
+def chapter_to_tuple(chapter_str):
+    if not chapter_str:
+        return (0,)  # 未分類視為最小章節
+    return tuple(map(int, re.findall(r'\d+', chapter_str)))
 
 # 載入題庫
 def load_questions():
@@ -13,24 +19,38 @@ def load_questions():
         st.error("❌ 找不到題庫檔案")
         return []
     with open(QUESTION_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        questions = json.load(f)
+    for q in questions:
+        q.setdefault("question", "")
+        q.setdefault("keywords", [])
+        q.setdefault("explanation", "")
+        q.setdefault("chapter", "")
+    return questions
 
-# 載入設定
+# 載入設定檔
 def load_config():
     if not os.path.exists(CONFIG_FILE):
-        st.error("❌ 尚未設定今日章節與題數，請至管理頁設定")
+        st.error("❌ 找不到設定檔，請先在管理頁設定")
         return None
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-# 根據章節抽題
-def get_questions_by_chapter(all_questions, chapter, count):
-    pool = [q for q in all_questions if q.get("chapter") == chapter]
-    return random.sample(pool, min(len(pool), count))
+# 根據章節範圍抽題（含空章節）
+def get_questions_within_chapter(questions, max_chapter, count):
+    max_tuple = chapter_to_tuple(max_chapter) if max_chapter else (9999,)
+    pool = [
+        q for q in questions
+        if chapter_to_tuple(q.get("chapter", "")) <= max_tuple
+    ]
+    total_available = len(pool)
+    selected = random.sample(pool, min(count, total_available))
+    return selected, total_available
 
-# 顯示單題
+# 顯示單題（含章節提示）
 def display_question(index, q):
     st.markdown(f"**題目 {index + 1}：{q['question']}**")
+    chapter_label = q.get("chapter") or "未分類"
+    st.caption(f"章節：CH{chapter_label}")
     user_input = st.text_input(f"你的回答 ({index + 1})", value=st.session_state.responses[index], key=f"input_{index}")
     st.session_state.responses[index] = user_input
 
@@ -52,6 +72,7 @@ def show_score(questions):
 # 主程式
 def main():
     st.title("新人每日小考")
+
     config = load_config()
     if not config:
         return
@@ -62,19 +83,25 @@ def main():
         return
 
     all_questions = load_questions()
-    selected_chapter = config["chapter"]
-    num_questions = config["num_questions"]
-    questions = get_questions_by_chapter(all_questions, selected_chapter, num_questions)
+    if not all_questions:
+        return
+
+    selected_chapter = config.get("chapter")
+    num_requested = config.get("num_questions", 7)
+
+    questions, total_available = get_questions_within_chapter(all_questions, selected_chapter, num_requested)
 
     # 初始化狀態
-    if "responses" not in st.session_state:
+    if "responses" not in st.session_state or len(st.session_state.responses) != len(questions):
         st.session_state.responses = ["" for _ in questions]
-    if "submitted" not in st.session_state:
+    if "submitted" not in st.session_state or len(st.session_state.submitted) != len(questions):
         st.session_state.submitted = [False for _ in questions]
     if "score_shown" not in st.session_state:
         st.session_state.score_shown = False
 
-    st.subheader(f"{username}，今日考題為【{selected_chapter}】章，請開始作答：")
+    # 顯示章節資訊
+    chapter_label = f"CH{selected_chapter}" if selected_chapter else "全部題目"
+    st.subheader(f"{username}，今日考題為【{chapter_label}】，共 {len(questions)} 題（原設定 {num_requested} 題，符合條件 {total_available} 題）")
 
     for idx, q in enumerate(questions):
         display_question(idx, q)
