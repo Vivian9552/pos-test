@@ -11,10 +11,15 @@ def init_questions():
         with open(QUESTION_FILE, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=2)
 
-# 載入題庫
+# 載入題庫並自動補全欄位
 def load_questions():
     with open(QUESTION_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        questions = json.load(f)
+    for q in questions:
+        q.setdefault("question", "")
+        q.setdefault("explanation", "")
+        q.setdefault("keywords", [])
+    return questions
 
 # 儲存題庫
 def save_questions(questions):
