@@ -2,9 +2,11 @@ import streamlit as st
 import json
 import os
 import re
+from datetime import datetime
 
 QUESTION_FILE = "questions.json"
 CONFIG_FILE = "quiz_config.json"
+BACKUP_FILE = "questions_backup.json"
 
 def chapter_to_tuple(chapter_str):
     return tuple(map(int, re.findall(r'\d+', chapter_str)))
@@ -24,15 +26,36 @@ def load_questions():
         q.setdefault("chapter", "")
     return questions
 
+def backup_questions(data):
+    # 備份成固定檔名
+    with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    # 備份成時間戳檔名
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    with open(f"questions_{timestamp}.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def check_external_change(current_data):
+    if not os.path.exists(BACKUP_FILE):
+        return False
+    with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+        backup_data = json.load(f)
+    return current_data != backup_data
+
 def save_questions(questions):
     with open(QUESTION_FILE, "w", encoding="utf-8") as f:
         json.dump(questions, f, ensure_ascii=False, indent=2)
+    backup_questions(questions)
 
 def show_question_manager():
     st.title("📚 題庫管理頁")
 
     init_questions()
     questions = load_questions()
+
+    # 檢查題庫是否被外部修改
+    if check_external_change(questions):
+        st.warning("⚠️ 偵測到題庫檔案與上次備份不同，可能被外部修改過")
 
     st.subheader("題目列表")
 
