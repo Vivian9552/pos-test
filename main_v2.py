@@ -12,7 +12,7 @@ def load_questions():
         return json.load(f)
 
 def main():
-    st.title("📝 POS 功能測驗 - 問答模式")
+    st.title("📝 操作說明每日小考")
     name = st.text_input("👤 請輸入作答者姓名")
 
     if not name:
@@ -30,7 +30,7 @@ def main():
         st.markdown(q["question"])
         answer = st.text_area("請作答", key=f"input_{i}")
 
-        if st.button("✅ 確認本題", key=f"check_{i}"):
+        if st.button("✅ 確認", key=f"check_{i}"):
             if match_keywords(answer, q["keywords"]):
                 st.success("✅ 回答正確！")
                 correctness.append(True)
