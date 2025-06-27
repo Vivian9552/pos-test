@@ -35,24 +35,26 @@ def show_question_manager():
     questions = load_questions()
 
     st.subheader("題目列表")
-    modified = False
 
     for idx, q in enumerate(questions):
-        with st.expander(f"題目 {idx + 1}"):
+        expander_label = q["question"] if q["question"] else f"題目 {idx + 1}"
+        with st.expander(expander_label):
+            q["chapter"] = st.text_input("章節", value=q["chapter"], key=f"c_{idx}")
             q["question"] = st.text_input("題目內容", value=q["question"], key=f"q_{idx}")
             q["keywords"] = st.text_input("關鍵字（用逗號分隔）", value=",".join(q["keywords"]), key=f"k_{idx}").split(",")
             q["explanation"] = st.text_area("說明", value=q["explanation"], key=f"e_{idx}")
-            q["chapter"] = st.text_input("章節", value=q["chapter"], key=f"c_{idx}")
 
-            if st.button("❌ 刪除", key=f"del_{idx}"):
-                questions.pop(idx)
-                save_questions(questions)
-                st.success("✅ 已刪除該題")
-                st.experimental_rerun()
-
-            if st.button("💾 儲存此題", key=f"save_{idx}"):
-                save_questions(questions)
-                st.success("✅ 該題已儲存")
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if st.button("💾 儲存", key=f"save_{idx}"):
+                    save_questions(questions)
+                    st.success("✅ 該題已儲存")
+            with col2:
+                if st.button("❌ 刪除", key=f"del_{idx}"):
+                    questions.pop(idx)
+                    save_questions(questions)
+                    st.success("✅ 已刪除該題")
+                    st.rerun()
 
     # 新增題目
     st.markdown("---")
@@ -72,11 +74,11 @@ def show_question_manager():
             })
             save_questions(questions)
             st.success("✅ 新題目已加入")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.warning("❗ 題目與關鍵字為必填欄位")
 
-    # 一鍵儲存按鈕
+    # 一鍵儲存
     st.markdown("---")
     if st.button("💾 一鍵儲存所有修改"):
         save_questions(questions)
@@ -129,12 +131,12 @@ def show_question_manager():
                 json.dump(config, f, ensure_ascii=False, indent=2)
             st.success(f"✅ 已儲存：CH{selected_chapter}，共 {num_questions} 題")
 
-    # 清除設定按鈕
+    # 清除設定
     if os.path.exists(CONFIG_FILE):
         if st.button("🗑️ 清除設定"):
             os.remove(CONFIG_FILE)
             st.success("✅ 設定已清除，將回到預設 7 題")
-            st.experimental_rerun()
+            st.rerun()
 
 if __name__ == "__main__":
     show_question_manager()
