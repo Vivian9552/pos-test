@@ -1,3 +1,4 @@
+# manage_questions.py
 import streamlit as st
 import json
 import os
@@ -40,26 +41,14 @@ def check_external_change(current_data):
         backup_data = json.load(f)
     return current_data != backup_data
 
-def save_questions(updated_questions):
-    if os.path.exists(QUESTION_FILE):
-        with open(QUESTION_FILE, "r", encoding="utf-8") as f:
-            current_data = json.load(f)
-    else:
-        current_data = []
-
-    current_dict = {q["question"]: q for q in current_data}
-    for q in updated_questions:
-        current_dict[q["question"]] = q
-
-    merged_data = list(current_dict.values())
-
+def save_questions(questions):
     with open(QUESTION_FILE, "w", encoding="utf-8") as f:
-        json.dump(merged_data, f, ensure_ascii=False, indent=2)
-
-    backup_questions(merged_data)
+        json.dump(questions, f, ensure_ascii=False, indent=2)
+    backup_questions(questions)
+    st.toast("✅ 題庫儲存與備份成功", icon="💾")
 
 def show_question_manager():
-    st.title("📚 題庫後台管理")
+    st.title("📚 題庫管理頁")
 
     init_questions()
     questions = load_questions()
@@ -81,8 +70,6 @@ def show_question_manager():
             with col1:
                 if st.button("💾 儲存", key=f"save_{idx}"):
                     save_questions(questions)
-                    st.success("✅ 該題已儲存")
-                    st.rerun()
             with col2:
                 if st.button("❌ 刪除", key=f"del_{idx}"):
                     questions.pop(idx)
@@ -91,11 +78,9 @@ def show_question_manager():
                     st.rerun()
 
     # 一鍵儲存
-    st.markdown("---")
     if st.button("💾 一鍵儲存"):
         save_questions(questions)
         st.success("✅ 所有修改已儲存")
-        st.rerun()
 
     # 新增題目
     st.markdown("---")
